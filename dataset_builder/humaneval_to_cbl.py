@@ -20,7 +20,7 @@ class Translator:
                 "\n"
         ])
     
-    def gen_ws(self) -> str:
+    def gen_ws(self, ann: ast.expr) -> str:
         pass
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
