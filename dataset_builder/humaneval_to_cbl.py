@@ -15,13 +15,13 @@ class Translator:
     prefix_last=True
 
     def __init__(self):
-        self.int_type = "pic 9(4)"
+        self.int_type = "pic s9(9)"
         pass
     
     def cbl_preamble(self, name) -> str:
         return "\n".join([
                 "identification division.",
-                "program-id "+name,
+                "program-id "+name+".",
                 "working-storage section.",
         ])
     
@@ -53,11 +53,11 @@ class Translator:
         arg_list = ""
         for arg in args:
             arg_list = arg_list + arg.arg + " "
-        return f"{self.cbl_preamble(name)}\nprocedure division using by value {arg_list}."
+        return f"{self.cbl_preamble(name)}\nprocedure division using by value {arg_list[:-1]}."
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
         """
-        Code for start of test suite.
+        Code for start of test suite. Actually added at the end... :)
         """
         return ["\ngoback.\n",
                 f"{self.cbl_preamble('test_prog')}",
