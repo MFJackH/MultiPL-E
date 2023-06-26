@@ -170,7 +170,17 @@ def translate_tests(translator, py_tests: str, entry_point: str, filename: str) 
         ...
     """
     tests_ast = ast.parse(py_tests, filename)
-    test_cases = translator.test_suite_prefix_lines(entry_point)
+    
+    try:
+        prefix_last = translator.prefix_last
+    except AttributeError:
+        prefix_last = False
+
+    if prefix_last is False:
+        test_cases = translator.test_suite_prefix_lines(entry_point)
+    else:
+        test_cases = []
+
     match tests_ast:
         case ast.Module(body=[ast.FunctionDef(body=body)]):
             body_ast = body
@@ -201,6 +211,10 @@ def translate_tests(translator, py_tests: str, entry_point: str, filename: str) 
                 return None
     for line in translator.test_suite_suffix_lines():
         test_cases.append(line)
+
+    if prefix_last is True:
+        test_cases = translator.test_suite_prefix_lines(entry_point) + test_cases
+
     return "\n".join(test_cases)
 
 

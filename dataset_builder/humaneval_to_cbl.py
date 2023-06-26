@@ -9,7 +9,13 @@ class Translator:
     
     stop=["\ngoback."]
 
+    ws=[]
+    ws_count=0;
+
+    prefix_last=True
+
     def __init__(self):
+        self.int_type = "pic 9(4)"
         pass
     
     def cbl_preamble(self, name) -> str:
@@ -17,15 +23,31 @@ class Translator:
                 "identification division.",
                 "program-id "+name,
                 "working-storage section.",
-                "\n"
         ])
     
+    def gen_ws_name(self) -> str:
+        name = f"test-{self.ws_count}"
+        self.ws_count += 1
+        return name
+    
     def gen_ws(self, ann: ast.expr) -> str:
-        pass
+        if ann == None:
+            raise Exception(f"No annotation")
+
+        match ann:
+            case ast.Name(id="int"):
+               name = self.gen_ws_name()
+               type = self.int_type
+            case _other:
+               raise Exception(f"Unhandled annotation: {ann}")
+        
+        self.ws.append(f"01 {name} {type}.")
+        return name
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
         # Set up globals
         self.entry_point = name
+        self.ret_ann = _returns
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
@@ -37,13 +59,10 @@ class Translator:
         """
         Code for start of test suite.
         """
-        return ["goback.",
-                "\n",
-                "identification division",
-                "program-id. test_prog.",
-                "working-storage section.",
-                "procedure division."
-                ]
+        return ["\ngoback.\n",
+                f"{self.cbl_preamble('test_prog')}",
+                "\n".join(self.ws),
+                "procedure division."]
     
     def test_suite_suffix_lines(self) -> List[str]:
         """
@@ -54,7 +73,18 @@ class Translator:
         """
         All tests are assertions that compare deep equality between left and right.
         """
-        return f"{left}returning abc.\nif abc = {right}\n    return true\nelse\n    return false\nend-if"
+        type=self.gen_ws(self.ret_ann)
+        return "\n".join([
+            f"{left}returning {type}.",
+            f"if {type} = {right}",
+            "    return true",
+            "else",
+            "    return false",
+            "end-if"
+        ])
+    
+    def finally_prepend(self) -> List[str]:
+        return self.ws
     
     def gen_call(self, func: str, args: List[str]) -> str:
         """Translate a function call `func(args)`
