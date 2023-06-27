@@ -36,7 +36,7 @@ class Translator:
         ]
         return preamble 
     
-    def gen_ws_name(self, ann) -> str:
+    def gen_data_item_name(self, ann) -> str:
         match ann:
             case ast.Name(id="bool"):
                 name = f"bool-{self.ws_count}"
@@ -52,11 +52,11 @@ class Translator:
         self.ws_count += 1
         return name
     
-    def gen_ws(self, ann: ast.expr) -> str:
+    def gen_data_item(self, ann: ast.expr, list) -> str:
         if ann == None:
             raise Exception(f"No annotation")
 
-        name = self.gen_ws_name(ann)
+        name = self.gen_data_item_name(ann)
 
         match ann:
             case ast.Name(id="bool"):
@@ -72,7 +72,7 @@ class Translator:
             case _other:
                raise Exception(f"Unhandled annotation: {ann}")
         
-        self.ws.append(f"01 {name} {type}.")
+        list.append(f"01 {name} {type}.")
         return name
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
@@ -85,10 +85,15 @@ class Translator:
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
+        linkage = []
         for arg in args:
             arg_list = arg_list + arg.arg + " "
+            self.gen_data_item(arg.annotation, linkage)
 
         prompt = self.cbl_preamble(name)
+        prompt += ["linkage section."] 
+        # Parameters
+        prompt += linkage
         prompt.append(f"procedure division using by value {arg_list[:-1]}.")
         return self.list_to_indent_str(prompt)
     
@@ -97,10 +102,10 @@ class Translator:
         Code for start of test suite. Actually added at the end... :)
         """
         prefix = ["", "goback.", ""]
-        prefix = prefix + self.cbl_preamble('test_prog')
-        prefix = prefix + self.ws
-        prefix = prefix + ["procedure division."]
-        prefix = prefix + self.structure_initialisation
+        prefix += self.cbl_preamble('test_prog')
+        prefix += self.ws
+        prefix += ["procedure division."]
+        prefix += self.structure_initialisation
         return self.indent_all(prefix)
     
     def test_suite_suffix_lines(self) -> List[str]:
@@ -116,7 +121,7 @@ class Translator:
         lvalue, _ = left
         rvalue, _ = right
 
-        type=self.gen_ws(self.ret_ann)
+        type=self.gen_data_item(self.ret_ann, self.ws)
         equality = [
             f"{lvalue}returning {type}.",
             f"if {type} = {rvalue}",
@@ -167,7 +172,7 @@ class Translator:
 
     def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> str:
         list_element_type = ast.List()
-        name = self.gen_ws(list_element_type)
+        name = self.gen_data_item(list_element_type, self.ws)
 
         # List Initialisation
         if len(l) != 0:
