@@ -2,10 +2,11 @@ import argparse
 from generic_translator import list_originals, translate_prompt_and_tests
 import os
 import subprocess
+import sys
 
 TESTERS = {
-    "cpp": { "translator": "humaneval_to_cpp", "build": "g++", "extension": "cpp" },
-    "cbl": { "translator": "humaneval_to_cbl","build": "cbllink", "extension": "cbl" }
+    "cpp": { "translator": "humaneval_to_cpp", "build": {"win": "cl", "lin": "g++"}, "extension": "cpp" },
+    "cbl": { "translator": "humaneval_to_cbl", "build": {"win": "cbllink", "lin": "cob"}, "extension": "cbl" }
 }
 test_translation_path = "translated_prompts_and_tests"
 
@@ -43,6 +44,13 @@ def main():
 
     os.makedirs(test_translation_path)
 
+    if sys.platform.startswith('win'):
+        platform = "win"
+    elif sys.platform.startswith('linux'):
+        platform = "lin"
+    else:
+        raise Exception("Invalid platform")
+
     translator_use = __import__(TESTERS[parsed_args.lang]["translator"]).Translator()
 
     # Loop through all problems in chosen set
@@ -73,9 +81,16 @@ def main():
         
         # Add compilation process here
         if(parsed_args.lang == "cbl"):
-            result = subprocess.run([TESTERS[parsed_args.lang]["build"], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if(platform == "win"):
+                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-x", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif(parsed_args.lang == "cpp"):
-            result = subprocess.run([TESTERS[parsed_args.lang]["build"], "-o", file_path_extension, "-std=c++17"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if(platform == "win"):
+                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                result = None
+            else:
+                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-o", file_path_extension, "-std=c++17"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
             raise Exception("No implementation for this language")
 
