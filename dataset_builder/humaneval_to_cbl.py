@@ -7,13 +7,10 @@ DOCSTRING_LINESTART_RE = re.compile("""\n(\s+)""")
 
 class Translator:
     
-    cols="        "
+    cols="       "
     
     stop=["\ngoback."]
 
-    ws=[]
-    ws_count=0;
-    structure_initialisation=[]
 
     prefix_last=True
 
@@ -82,6 +79,9 @@ class Translator:
         # Set up globals
         self.entry_point = name
         self.ret_ann = _returns
+        self.ws = []
+        self.ws_count=0;
+        self.structure_initialisation=[]
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
@@ -118,11 +118,11 @@ class Translator:
 
         type=self.gen_ws(self.ret_ann)
         equality = [
-            f"{lvalue}returning {rvalue}.",
+            f"{lvalue}returning {type}.",
             f"if {type} = {rvalue}",
-            "    return true",
+            "    display \"pass\"",
             "else",
-            "    return false",
+            "    display \"fail\"",
             "end-if"]
         return self.list_to_indent_str(equality)
     
