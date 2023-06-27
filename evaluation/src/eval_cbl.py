@@ -3,7 +3,7 @@ from pathlib import Path
 from safe_subprocess import run
 
 LANG_NAME = "COBOL"
-LANG_EXT = ".sh"
+LANG_EXT = ".cbl"
 
 def eval_script(path: Path):
     my_env = os.environ.copy()
