@@ -7,11 +7,13 @@ DOCSTRING_LINESTART_RE = re.compile("""\n(\s+)""")
 
 class Translator:
     
+    cols="        "
+    
     stop=["\ngoback."]
 
     ws=[]
     ws_count=0;
-    structure_initialisation=""
+    structure_initialisation=[]
 
     prefix_last=True
 
@@ -23,12 +25,19 @@ class Translator:
         self.list_type = "pic x(elem_size) occurs n"
         pass
     
+    def indent_all(self, list) -> List[str]:
+        return [f"{self.cols}{i}" for i in list]
+
+    def list_to_indent_str(self, list) -> str:
+        return "\n".join(self.indent_all(list))
+    
     def cbl_preamble(self, name) -> str:
-        return "\n".join([
-                "identification division.",
-                "program-id "+name+".",
-                "working-storage section.",
-        ])
+        preamble = [
+            "identification division.",
+            "program-id "+name+".",
+            "working-storage section.",
+        ]
+        return preamble 
     
     def gen_ws_name(self, ann) -> str:
         match ann:
@@ -78,22 +87,26 @@ class Translator:
         arg_list = ""
         for arg in args:
             arg_list = arg_list + arg.arg + " "
-        return f"{self.cbl_preamble(name)}\nprocedure division using by value {arg_list[:-1]}."
+
+        prompt = self.cbl_preamble(name)
+        prompt.append(f"procedure division using by value {arg_list[:-1]}.")
+        return self.list_to_indent_str(prompt)
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
         """
         Code for start of test suite. Actually added at the end... :)
         """
-        return ["\ngoback.\n",
-                f"{self.cbl_preamble('test_prog')}",
-                "\n".join(self.ws),
-                "procedure division.\n",
-                self.structure_initialisation]
+        prefix = ["", "goback.", ""]
+        prefix = prefix + self.cbl_preamble('test_prog')
+        prefix = prefix + self.ws
+        prefix = prefix + ["procedure division."]
+        prefix = prefix + self.structure_initialisation
+        return self.indent_all(prefix)
     
     def test_suite_suffix_lines(self) -> List[str]:
         """
         """
-        return ["goback."]
+        return self.indent_all(["goback."])
     
     def deep_equality(self, left: Tuple[str, ast.Expr], right: Tuple[str, ast.Expr]) -> str:
         """
@@ -104,17 +117,14 @@ class Translator:
         rvalue, _ = right
 
         type=self.gen_ws(self.ret_ann)
-        return "\n".join([
+        equality = [
             f"{lvalue}returning {rvalue}.",
             f"if {type} = {rvalue}",
             "    return true",
             "else",
             "    return false",
-            "end-if"
-        ])
-    
-    def finally_prepend(self) -> List[str]:
-        return self.ws
+            "end-if"]
+        return self.list_to_indent_str(equality)
     
     def gen_call(self, func: str, args: List[str]) -> str:
         """Translate a function call `func(args)`
@@ -129,7 +139,7 @@ class Translator:
         else:
             func_name = func
 
-        return f"call \"{func_name}\" using by value {arg_list}"
+        return self.list_to_indent_str([f"call \"{func_name}\" using by value {arg_list}"])
     
     # Below are todo. Produces typescript.
 
@@ -161,10 +171,9 @@ class Translator:
 
         # List Initialisation
         if len(l) != 0:
-            self.structure_initialisation += f"*> Initialisation for {name}\n"
+            self.structure_initialisation.append(f"*> Initialisation for {name}")
             for position, (elem, _) in enumerate(l):
-                self.structure_initialisation += f"move {elem} to {name}({position})\n"
-            self.structure_initialisation += "\n"
+                self.structure_initialisation.append(f"move {elem} to {name}({position})")
 
         return name, ast.List()
 
