@@ -15,12 +15,12 @@ class Translator:
     prefix_last=True
 
     def __init__(self):
-        self.bool_type = "pic x comp-x"
-        self.int_type = "pic s9(9)"
-        self.float_type = "pic s9(9)"
-        self.str_type = "pic x(n)"
-        self.list_type = "pic x(elem_size) occurs n"
-        pass
+        self.literal_types = {
+            "bool": "pic x comp-x",
+            "int": "pic x(4) comp-x",
+            "float": "pic 9(9)v99",
+            "str": "pic x(256)"
+        }
     
     def indent_all(self, list) -> List[str]:
         return [f"{self.cols}{i}" for i in list]
@@ -36,43 +36,22 @@ class Translator:
         ]
         return preamble 
     
-    def gen_data_item_name(self, ann) -> str:
-        match ann:
-            case ast.Name(id="bool"):
-                name = f"bool-{self.ws_count}"
-            case ast.Name(id="int"):
-                name = f"int-{self.ws_count}"
-            case ast.Name(id="float"):
-                name = f"float-{self.ws_count}"
-            case ast.Name(id="str"):
-                name = f"str-{self.ws_count}"
-            case ast.List():
-                name = f"list-{self.ws_count}"
-
-        self.ws_count += 1
-        return name
-    
     def gen_data_item(self, ann: ast.expr, list) -> str:
         if ann == None:
             raise Exception(f"No annotation")
 
-        name = self.gen_data_item_name(ann)
-
         match ann:
-            case ast.Name(id="bool"):
-                type = self.bool_type
-            case ast.Name(id="int"):
-                type = self.int_type
-            case ast.Name(id="float"):
-                type = self.float_type
-            case ast.Name(id="str"):
-                type = self.str_type
+            case ast.Name(id=_):
+                ws_type = self.literal_types[ann.id]
+                name = f"{ann.id}-{self.ws_count}"
             case ast.List():
-                type = self.list_type
-            case _other:
-               raise Exception(f"Unhandled annotation: {ann}")
-        
-        list.append(f"01 {name} {type}.")
+                ws_type = self.gen_list_type(ann.elts)
+                name = f"list-{self.ws_count}"
+            case _:
+                raise Exception(f"Unhandled annotation: {ann}")
+
+        self.ws_count += 1
+        list.append(f"01 {name} {ws_type}.")
         return name
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
@@ -88,7 +67,7 @@ class Translator:
         linkage = []
         for arg in args:
             arg_list = arg_list + arg.arg + " "
-            self.gen_data_item(arg.annotation, linkage)
+            # self.gen_data_item(arg.annotation, linkage)
 
         prompt = self.cbl_preamble(name)
         prompt += ["linkage section."] 
@@ -171,8 +150,7 @@ class Translator:
         return v
 
     def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> str:
-        list_element_type = ast.List()
-        name = self.gen_data_item(list_element_type, self.ws)
+        name = self.gen_data_item(ast.List(elts=l), self.ws)
 
         # List Initialisation
         if len(l) != 0:
@@ -185,7 +163,7 @@ class Translator:
     def gen_list_type(self, l: List[Tuple[str, ast.Expr]]) -> str:
         elem_type = l[0][1]
         if elem_type.id in self.literal_types.keys():
-            return f"pic {self.literal_types[elem_type.id]} occurs {len(l)}"
+            return f"{self.literal_types[elem_type.id]} occurs {len(l)}"
 
 
     def gen_tuple(self, t: List[str]) -> str:
