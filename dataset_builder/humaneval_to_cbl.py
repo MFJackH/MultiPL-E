@@ -177,6 +177,12 @@ class Translator:
 
         return name, ast.List()
 
+    def gen_list_type(self, l: List[Tuple[str, ast.Expr]]) -> str:
+        elem_type = l[0][1]
+        if elem_type.id in self.literal_types.keys():
+            return f"pic {self.literal_types[elem_type.id]} occurs {len(l)}"
+
+
     def gen_tuple(self, t: List[str]) -> str:
         return "[" + ", ".join(t) + "]"
 
