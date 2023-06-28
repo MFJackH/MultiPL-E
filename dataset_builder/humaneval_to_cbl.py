@@ -101,11 +101,9 @@ class Translator:
             # We could either do this, or maybe return 'address of' ?
             return_item = return_item.split(" ")[0]
             prompt_ws = prompt_ws[:-1]
-
             prompt_ws.append(f"01 {return_item} pointer.")
-            on_return_help_text.append(f"*> {return_item} is the return item, and is a pointer to a {self.literal_types[_returns.id]} occurs.")
-        else:
-            on_return_help_text.append(f"*> {return_item} is the return item.")
+        
+        on_return_help_text.append(f"*> Return from program with 'goback returning {return_item}.'")
 
         prompt = cbl_description.split("\n")
         prompt += on_entry_help_text
@@ -115,7 +113,7 @@ class Translator:
         prompt += ["linkage section."] 
         # Parameters
         prompt += prompt_lk
-        prompt.append(f"procedure division using by reference {arg_list[:-1]} returning {return_item}.")
+        prompt.append(f"procedure division using by reference {arg_list[:-1]}.")
         return self.list_to_indent_str(prompt)
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
