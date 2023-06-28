@@ -15,6 +15,10 @@ class Translator:
     prefix_last=True
 
     def __init__(self):
+        self.ws = []
+        self.ws_count=0;
+        self.structure_initialisation=[]
+        self.sections = []
         self.literal_types = {
             "bool": "pic x comp-x",
             "int": "pic x(4) comp-x",
@@ -58,9 +62,6 @@ class Translator:
         # Set up globals
         self.entry_point = name
         self.ret_ann = _returns
-        self.ws = []
-        self.ws_count=0;
-        self.structure_initialisation=[]
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
@@ -90,7 +91,9 @@ class Translator:
     def test_suite_suffix_lines(self) -> List[str]:
         """
         """
-        return self.indent_all(["goback."])
+        suffix = ["", "goback.", ""]
+        suffix += self.sections
+        return self.indent_all(suffix)
     
     def deep_equality(self, left: Tuple[str, ast.Expr], right: Tuple[str, ast.Expr]) -> str:
         """
@@ -102,10 +105,12 @@ class Translator:
 
         return_item=self.gen_data_item(self.ret_ann, self.ws)
 
-        equality_section = gen_equality_section(lvalue,rvalue, return_item)
+        if type(ltype) == ast.List and type(rtype) == ast.List:
+            equality_section = self.gen_equality_section(lvalue, rvalue, return_item)
+            self.sections.append(equality_section)
 
         equality = [
-            f"{lvalue}returning {return_item}.",
+            f"{lvalue} returning {return_item}.",
             f"if {return_item} = {rvalue}",
             "    display \"pass\"",
             "else",
@@ -128,21 +133,23 @@ class Translator:
 
         return self.list_to_indent_str([f"call \"{func_name}\" using by value {arg_list}"])
     
-    def gen_equality_section(lvalue,rvalue, return_item):
+    def gen_equality_section(self, lvalue,rvalue, return_item):
         return f"""
-        if length of {lvalue} not equal length of {rvalue}
-            move false to return-code
-            goback
-        end-if
-        perform varying ws-i from 1 by 1
-        until ws-i > length of list-1
-            if {lvalue}(ws-i) not equal {rvalue}(ws-i)
+        check-{lvalue}-{rvalue}-equality section.
+            if length of {lvalue} not equal length of {rvalue}
                 move false to return-code
-                goback
+                exit section
             end-if
-        end-perform 
-        move true to {return_item}
-        goback"""
+            perform varying ws-i from 1 by 1
+            until ws-i > length of list-1
+                if {lvalue}(ws-i) not equal {rvalue}(ws-i)
+                    move false to return-code
+                    exit section
+                end-if
+            end-perform 
+            move true to {return_item}
+            .
+        """
 
     # Below are todo. Produces typescript.
 
@@ -168,7 +175,7 @@ class Translator:
         """Translate a variable with name v."""
         return v
 
-    def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> str:
+    def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> Tuple[str, ast.Expr]:
         name = self.gen_data_item(ast.List(elts=l), self.ws)
 
         # List Initialisation
