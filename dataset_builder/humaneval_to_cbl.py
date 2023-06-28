@@ -74,6 +74,8 @@ class Translator:
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
         # Set up globals
+        self.ws_count = 0
+        self.ws = []
         self.entry_point = name
         self.ret_ann = _returns
         # Do stuff
