@@ -86,7 +86,8 @@ class Translator:
         for arg in args:
             arg_list += self.gen_data_item(arg.annotation, linkage) + " "
 
-        prompt = self.cbl_preamble(name)
+        prompt = cbl_description.split("\n")
+        prompt += self.cbl_preamble(name)
         prompt += ["linkage section."] 
         # Parameters
         prompt += linkage
