@@ -76,6 +76,7 @@ class Translator:
         # Set up globals
         self.ws_count = 0
         self.ws = []
+        self.structure_initialisation = []
         self.entry_point = name
         self.ret_ann = _returns
         # Do stuff
