@@ -105,6 +105,7 @@ class Translator:
         """
         """
         suffix = ["", "goback.", ""]
+        suffix += "end program test_prog."
         suffix += self.sections
         return self.indent_all(suffix)
     
