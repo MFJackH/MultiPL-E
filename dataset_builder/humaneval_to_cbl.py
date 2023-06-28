@@ -82,16 +82,40 @@ class Translator:
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
-        linkage = []
+        prompt_ws = []
+        prompt_lk = []
+
+        on_entry_help_text = []
+        on_return_help_text = []
+
         for arg in args:
-            arg_list += self.gen_data_item(arg.annotation, linkage) + " "
+            data_item = self.gen_data_item(arg.annotation, prompt_lk)
+            on_entry_help_text.append(f"*> {data_item} is received on entry.")
+            arg_list += data_item + " "
+
+        # We're going to need a returning item for this.
+        return_item = self.gen_data_item(_returns, prompt_ws)
+
+        # Looks like our returning item was really a list.
+        if len(return_item.split(" ")) > 1:
+            # We could either do this, or maybe return 'address of' ?
+            return_item = return_item.split(" ")[0]
+            prompt_ws = prompt_ws[:-1]
+
+            prompt_ws.append(f"01 {return_item} pointer.")
+            on_return_help_text.append(f"*> {return_item} is the return item, and is a pointer to a {self.literal_types[_returns.id]} occurs.")
+        else:
+            on_return_help_text.append(f"*> {return_item} is the return item.")
 
         prompt = cbl_description.split("\n")
+        prompt += on_entry_help_text
+        prompt += on_return_help_text
         prompt += self.cbl_preamble(name)
+        prompt += prompt_ws
         prompt += ["linkage section."] 
         # Parameters
-        prompt += linkage
-        prompt.append(f"procedure division using by reference {arg_list[:-1]}.")
+        prompt += prompt_lk
+        prompt.append(f"procedure division using by reference {arg_list[:-1]} returning {return_item}.")
         return self.list_to_indent_str(prompt)
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
