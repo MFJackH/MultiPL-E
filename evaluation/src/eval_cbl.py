@@ -13,7 +13,7 @@ def eval_script(path: Path):
     my_env["CLASSPATH"] = f".:/opt/microfocus/EnterpriseDeveloper/lib/mfcobolrts.jar:/opt/microfocus/EnterpriseDeveloper/lib/mfcobol.jar:/opt/microfocus/EnterpriseDeveloper/lib/mfsqljvm.jar:/opt/microfocus/EnterpriseDeveloper/lib/mfidmr.jar"
     my_env["LD_LIBRARY_PATH"] = f"/opt/microfocus/EnterpriseDeveloper/lib"
 
-    build_result = run(["cob", "-x", path, "-o", "testit.exe"], env=my_env)
+    build_result = run(["cob", "-x", path, "-o", "testit.exe", "-C\"SOURCEFORMAT(FREE)\""], env=my_env)
     if build_result.exit_code != 0:
         return {
             "status": "SyntaxError",
