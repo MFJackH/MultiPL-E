@@ -62,7 +62,7 @@ class Translator:
                 self.ws_count += 1
                 return f"{idx_name} {list_name}"
             case _:
-                raise Excepton(f"Unhandled annotation: {ann}")
+                raise Exception(f"Unhandled annotation: {ann}")
 
         self.ws_count += 1
         list.append(f"01 {name} {ws_type}.")
