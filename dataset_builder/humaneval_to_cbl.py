@@ -97,13 +97,16 @@ class Translator:
         All tests are assertions that compare deep equality between left and right.
         """
 
-        lvalue, _ = left
-        rvalue, _ = right
+        lvalue, ltype = left
+        rvalue, rtype = right
 
-        type=self.gen_data_item(self.ret_ann, self.ws)
+        return_item=self.gen_data_item(self.ret_ann, self.ws)
+
+        equality_section = gen_equality_section(lvalue,rvalue, return_item)
+
         equality = [
-            f"{lvalue}returning {type}.",
-            f"if {type} = {rvalue}",
+            f"{lvalue}returning {return_item}.",
+            f"if {return_item} = {rvalue}",
             "    display \"pass\"",
             "else",
             "    display \"fail\"",
@@ -125,6 +128,22 @@ class Translator:
 
         return self.list_to_indent_str([f"call \"{func_name}\" using by value {arg_list}"])
     
+    def gen_equality_section(lvalue,rvalue, return_item):
+        return f"""
+        if length of {lvalue} not equal length of {rvalue}
+            move false to return-code
+            goback
+        end-if
+        perform varying ws-i from 1 by 1
+        until ws-i > length of list-1
+            if {lvalue}(ws-i) not equal {rvalue}(ws-i)
+                move false to return-code
+                goback
+            end-if
+        end-perform 
+        move true to {return_item}
+        goback"""
+
     # Below are todo. Produces typescript.
 
     def gen_literal(self, c: bool | str | int | float) -> Tuple[str, ast.Name]:
