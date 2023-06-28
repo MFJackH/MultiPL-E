@@ -105,8 +105,8 @@ class Translator:
         """
         """
         suffix = ["", "goback.", ""]
-        suffix += ["end program test_prog."]
         suffix += self.sections
+        suffix += ["end program test_prog."]
         return self.indent_all(suffix)
     
     def deep_equality(self, left: Tuple[str, ast.Expr], right: Tuple[str, ast.Expr]) -> str:
