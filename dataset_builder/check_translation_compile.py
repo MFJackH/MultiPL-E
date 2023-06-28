@@ -82,7 +82,10 @@ def main():
         # Add compilation process here
         if(parsed_args.lang == "cbl"):
             if(platform == "win"):
-                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                with open("directives.dir", "w") as file:
+                    file.write("SOURCEFORMAT(FREE)")
+
+                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-Udirectives.dir", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-x", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif(parsed_args.lang == "cpp"):

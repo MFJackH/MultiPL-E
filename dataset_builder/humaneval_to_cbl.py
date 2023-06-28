@@ -45,10 +45,24 @@ class Translator:
                 ws_type = self.literal_types[ann.id]
                 name = f"{ann.id}-{self.ws_count}"
             case ast.List():
-                ws_type = self.gen_list_type(ann.elts)
-                name = f"list-{self.ws_count}"
+                idx_name = f"idx-{self.ws_count}"
+                list.append(f"01 {idx_name} pic 9(4).")
+                self.ws_count += 1
+                list_name = f"list-{self.ws_count}"
+                list.append(f"01 {list_name} {self.gen_list_type(ann.elts)} occurs 1000 depending on {idx_name}.")
+                self.ws_count += 1
+                return f"{idx_name} {list_name}" 
+            case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
+                # List as a parameter.
+                idx_name = f"idx-{self.ws_count}"
+                list.append(f"01 {idx_name} pic 9(4).")
+                self.ws_count += 1
+                list_name = f"list-{self.ws_count}"
+                list.append(f"01 {list_name} {self.literal_types[elem_type.id]} occurs 1000 depending on {idx_name}.")
+                self.ws_count += 1
+                return f"{idx_name} {list_name}"
             case _:
-                raise Exception(f"Unhandled annotation: {ann}")
+                raise Excepton(f"Unhandled annotation: {ann}")
 
         self.ws_count += 1
         list.append(f"01 {name} {ws_type}.")
@@ -59,21 +73,20 @@ class Translator:
         self.entry_point = name
         self.ret_ann = _returns
         self.ws = []
-        self.ws_count=0;
+        self.ws_count=0
         self.structure_initialisation=[]
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
         linkage = []
         for arg in args:
-            arg_list = arg_list + arg.arg + " "
-            # self.gen_data_item(arg.annotation, linkage)
+            arg_list += self.gen_data_item(arg.annotation, linkage) + " "
 
         prompt = self.cbl_preamble(name)
         prompt += ["linkage section."] 
         # Parameters
         prompt += linkage
-        prompt.append(f"procedure division using by value {arg_list[:-1]}.")
+        prompt.append(f"procedure division using by reference {arg_list[:-1]}.")
         return self.list_to_indent_str(prompt)
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
@@ -90,7 +103,7 @@ class Translator:
     def test_suite_suffix_lines(self) -> List[str]:
         """
         """
-        return self.indent_all(["goback."])
+        return self.indent_all(["goback.", "end program test_prog."])
     
     def deep_equality(self, left: Tuple[str, ast.Expr], right: Tuple[str, ast.Expr]) -> str:
         """
@@ -123,7 +136,7 @@ class Translator:
         else:
             func_name = func
 
-        return self.list_to_indent_str([f"call \"{func_name}\" using by value {arg_list}"])
+        return self.list_to_indent_str([f"call \"{func_name}\" using by reference {arg_list}"])
     
     # Below are todo. Produces typescript.
 
@@ -132,7 +145,7 @@ class Translator:
         c: is the literal value
         """
         if type(c) == bool:
-            return "true" if c else "false", ast.Name("bool")
+            return "1" if c else "0", ast.Name("bool")
         elif type(c) == str:
             c = c.replace('\n','\\n'), ast.Name("str")
             return f'"{c}"'
@@ -152,19 +165,25 @@ class Translator:
     def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> str:
         name = self.gen_data_item(ast.List(elts=l), self.ws)
 
+        # The list name is actually a pair of space seperated index and list variable...
+        # Look just don't worry about it ok
+
+        idx = name.split(" ")[0]
+        list = name.split(" ")[1]
+
         # List Initialisation
         if len(l) != 0:
-            self.structure_initialisation.append(f"*> Initialisation for {name}")
+            self.structure_initialisation.append(f"*> Initialisation for {list}")
+            self.structure_initialisation.append(f"move {len(l)} to {idx}")
             for position, (elem, _) in enumerate(l):
-                self.structure_initialisation.append(f"move {elem} to {name}({position})")
+                self.structure_initialisation.append(f"move {elem} to {list}({position+1})")
 
         return name, ast.List()
 
     def gen_list_type(self, l: List[Tuple[str, ast.Expr]]) -> str:
         elem_type = l[0][1]
         if elem_type.id in self.literal_types.keys():
-            return f"{self.literal_types[elem_type.id]} occurs {len(l)}"
-
+            return f"{self.literal_types[elem_type.id]}"
 
     def gen_tuple(self, t: List[str]) -> str:
         return "[" + ", ".join(t) + "]"
@@ -185,4 +204,4 @@ class Translator:
         else:
             func_name = func
 
-        return f"call \"{func_name}\" using by value {arg_list}", ast.Call()
+        return f"call \"{func_name}\" using by reference {arg_list}", ast.Call()
