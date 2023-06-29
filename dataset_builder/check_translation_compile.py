@@ -82,7 +82,7 @@ def main():
 
         with open(file_path_extension, "w") as file:
             print(f"Writing prompt translation to {file_path_extension}")
-            content = prompt + "\n       >* Write the code solution as part of this function" +  tests
+            content = prompt + "\n       *> Write the code solution as part of this procedure division" +  tests
             file.write(content)
         
         # Add compilation process here
