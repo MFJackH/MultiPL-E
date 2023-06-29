@@ -1,2 +1,6 @@
 /__pycache__
 /translated_prompts_and_tests
+**/*.obj
+**/*.exe
+**/*.lnk
+**/*.dir

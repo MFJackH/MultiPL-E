@@ -99,8 +99,8 @@ def main():
         if (result.returncode):
             compiler_fails += 1
 
-    print(f"Translation fails {skip_fails} / {len(originals)}")
-    print(f"Compiler fails {compiler_fails} / {len(originals)}")
+    print(f"Translation successes {len(originals) - skip_fails} / {len(originals)}")
+    print(f"Compiler successes {len(originals) - compiler_fails - skip_fails} / {len(originals)}")
 
 if __name__ == "__main__":
     main()
