@@ -28,11 +28,11 @@ class Translator:
         # Used to provide unique names to storage items
         self.value_type = ["input", "output", "expected"]
         self.data_item_usage = DataItemUsage.PARAMETER
-        self.assert_offset = 0
+        self.assert_offset = 1
 
         self.ws = []
         self.list_dict = {}
-        self.ws_count=0;
+        self.ws_count=1;
         self.structure_initialisation=[]
         self.sections = []
         self.literal_types = {
@@ -59,28 +59,38 @@ class Translator:
     
     def gen_data_item_type(self, id, storage_area, type=None) -> CobolDataItem:
         item = CobolDataItem()
-        item.name = f"{id}-{self.ws_count}"
+        usage_type = self.get_usage_type()
+        test_case = self.get_test_case_id()
+        item.name = f"{test_case}-{usage_type}-{id}-{self.ws_count}"
 
         if type is None:
             type = self.literal_types[id]
 
         item.type = type
 
-        storage_area.append(f"01 {self.get_usage_type()}-{item.name} {item.type}.")
+        storage_area.append(f"01 {item.name} {item.type}.")
         self.ws_count += 1
         return item 
     
     def gen_list_data_item(self, id, storage_area, prefix="list") -> CobolDataItem:
         item = CobolDataItem(list=True)
-        item.idx = self.gen_data_item_type("idx", storage_area)
-        item.name = f"{self.get_usage_type()}-list-{self.ws_count}"
+        idx = CobolDataItem()
+        usage_type = self.get_usage_type()
+        test_case = self.get_test_case_id()
+
+        idx.name = f"{test_case}-{usage_type}-idx-{self.ws_count}"
+        idx.type = self.literal_types["idx"]
+
+        item.name = f"{test_case}-{usage_type}-list-{self.ws_count}"
         item.type = self.literal_types[id]
-        item.data = f"data-{item.name}"
+        item.data = f"{item.name}-data"
+        item.idx = idx
 
         self.ws_count += 1
 
         storage_area.append(f"01 {item.name}.")
-        storage_area.append(f"  03 {item.data} {item.type} occurs 1000 depending on {item.idx.name}.")
+        storage_area.append(f"  03 {idx.name} {idx.type}.")
+        storage_area.append(f"  03 {item.data} {item.type} occurs 1000 depending on {idx.name}.")
         return item
     
     def gen_data_item(self, ann: ast.expr, storage_area) -> CobolDataItem:
@@ -115,7 +125,7 @@ class Translator:
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
         # Set up globals
-        self.ws_count = 0
+        self.ws_count = 1
         self.ws = []
         self.structure_initialisation = []
         self.entry_point = name
@@ -123,9 +133,7 @@ class Translator:
         # Do stuff
         cbl_description = "*>" + re.sub(DOCSTRING_LINESTART_RE, "\n*> ", description.strip()) + "\n"
         arg_list = ""
-        prompt_ws = []
         prompt_lk = []
-
         on_entry_help_text = []
         on_return_help_text = []
 
@@ -134,26 +142,18 @@ class Translator:
             on_entry_help_text.append(f"*> {data_item.name} is received on entry.")
             arg_list += data_item.name + " "
 
-        # We're going to need a returning item for this.
-        return_item = self.gen_data_item(_returns, prompt_ws)
-
-        # Looks like our returning item was really a list.
-        # FIXME this is terrible
-        if return_item.is_list:
-            prompt_ws = prompt_ws[:-1]
-            prompt_ws.append(f"01 {return_item.name} pointer.")
-        
-        on_return_help_text.append(f"*> Return from program with 'goback returning {return_item.name}.'")
+        on_return_help_text.append(f"*> Return from program with 'goback.'")
 
         prompt = cbl_description.split("\n")
         prompt += on_entry_help_text
         prompt += on_return_help_text
         prompt += self.cbl_preamble(name)
-        prompt += prompt_ws
         prompt += ["linkage section."] 
         # Parameters
         prompt += prompt_lk
         prompt.append(f"procedure division using by reference {arg_list[:-1]}.")
+
+        self.ws_count=1
         return self.list_to_indent_str(prompt)
     
     def test_suite_prefix_lines(self, entry_point) -> List[str]:
@@ -194,7 +194,7 @@ class Translator:
             comparison = f"if {return_item.name} = {rvalue}"
 
         equality = [
-            f"{lvalue} returning {return_item.name}.",
+            f"{lvalue} {return_item.name}.",
             comparison,
             "    display \"pass\"",
             "else",
@@ -290,3 +290,6 @@ class Translator:
 
     def get_usage_type(self) -> str:
         return self.value_type[self.data_item_usage.value]
+
+    def get_test_case_id(self) -> str:
+        return f"test-case-{self.assert_offset}"

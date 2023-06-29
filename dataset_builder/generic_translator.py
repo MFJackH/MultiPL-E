@@ -215,6 +215,7 @@ def translate_tests(translator, py_tests: str, entry_point: str, filename: str) 
                     
                     if translator.file_ext() == "cbl":
                         translator.assert_offset += 1
+                        translator.ws_count = 1
                 except Exception as e:
                     print(f"Exception translating expressions for {filename}: {e}")
                     traceback.print_exception(e)
