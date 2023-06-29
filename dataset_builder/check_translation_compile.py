@@ -33,6 +33,12 @@ def main():
         help="Originals to use for translation",
         default="../datasets/originals"
     )
+    args.add_argument(
+        "--compile-check",
+        type=str,
+        help="Whether to check the translated prompt and test compile: true or false",
+        default="true"
+    )
     parsed_args = args.parse_args()
 
     # Delete exist test translations
@@ -76,31 +82,34 @@ def main():
 
         with open(file_path_extension, "w") as file:
             print(f"Writing prompt translation to {file_path_extension}")
-            content = prompt + tests
+            content = prompt + "\n       *> Write the code solution as part of this procedure division" +  tests
             file.write(content)
         
         # Add compilation process here
-        if(parsed_args.lang == "cbl"):
-            if(platform == "win"):
-                with open("directives.dir", "w") as file:
-                    file.write("SOURCEFORMAT(FREE)")
-                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], f"-O{test_translation_path}\{file_name_no_extension}.exe", "-Udirectives.dir", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            else:
-                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-x", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        elif(parsed_args.lang == "cpp"):
-            if(platform == "win"):
-                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                result = None
-            else:
-                result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-o", file_path_extension, "-std=c++17"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            raise Exception("No implementation for this language")
 
-        if (result.returncode):
-            compiler_fails += 1
+        if parsed_args.compile_check == "true":
+            if parsed_args.lang == "cbl":
+                if(platform == "win"):
+                    with open("directives.dir", "w") as file:
+                        file.write("SOURCEFORMAT(FREE)")
+                    result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], f"-O{test_translation_path}\{file_name_no_extension}.exe", "-Udirectives.dir", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-x", file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif parsed_args.lang == "cpp":
+                if(platform == "win"):
+                    result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], file_path_extension], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    result = None
+                else:
+                    result = subprocess.run([TESTERS[parsed_args.lang]["build"][platform], "-o", file_path_extension, "-std=c++17"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                raise Exception("No implementation for this language")
+
+            if (result.returncode):
+             compiler_fails += 1
 
     print(f"Translation successes {len(originals) - skip_fails} / {len(originals)}")
-    print(f"Compiler successes {len(originals) - compiler_fails - skip_fails} / {len(originals)}")
+    if parsed_args.compile_check == "true":
+        print(f"Compiler successes {len(originals) - compiler_fails - skip_fails} / {len(originals)}")
 
 if __name__ == "__main__":
     main()

@@ -122,7 +122,7 @@ class PromptVisitor(ast.NodeVisitor):
                             desc += '*> >>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
                         pos = i[1]
                     
-                    desc += '*> Write the solution within the defined function below\n'
+                    desc += '*> Write the solution within the defined procedure division below\n'
                     desc += self.description[pos:]
 
                     # for test in (promptAndDoctests[1:]): #Removing each doctest from any junk
