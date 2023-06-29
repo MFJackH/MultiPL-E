@@ -5,6 +5,7 @@ This Script takes a .json.gz file and extracts the prompt and completed source i
 import argparse
 import json
 import gzip
+import os
 
 def get_args():
     args = argparse.ArgumentParser()
@@ -29,23 +30,22 @@ def main():
 
     prompt = data["prompt"]
     completions = data["completions"]
+    test = data["tests"]
 
     outfile_base = ""
     if args.output_dir:
         outfile_base = args.output_dir
-    outfile_base += (filename.split('\\')[-1]).split('.')[0]
+    filename = os.path.basename(filename)
+    first_ext_gone = os.path.splitext(filename)[0]
+    filename = os.path.splitext(first_ext_gone)[0]
+    print(filename)
+    joined_path = os.path.join(outfile_base, filename)
 
-    #Write out the test program
-    testfile_name = outfile_base + "_test.cbl"
-    with open(testfile_name, "w") as oft:
-        oft.write(data["tests"])
-
-    #Write out the programs generated from the LLM
     i = 0
     for completion in completions:
-        outfile = outfile_base + str(i) + ".cbl"
+        outfile = joined_path + str(i) + ".cbl"
         with open(outfile, 'w') as of:
-            of.write(prompt + completion)
+            of.write(prompt + completion + test)
         print(f"File: {outfile} written to disk")
         i +=1
 
