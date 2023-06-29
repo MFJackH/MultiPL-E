@@ -16,9 +16,7 @@ class Translator:
     
     stop=["\ngoback."]
 
-
     prefix_last=True
-
 
     def __init__(self):
         self.ws = []
@@ -86,8 +84,7 @@ class Translator:
             case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
                 return self.gen_list_data_item(elem_type.id, list)
             case ast.Subscript(value=ast.Name(id="Dict"), slice=elem_type):
-                # A dictionary is just a table.
-                pass
+                Exception(f"Dicts do not exist in COBOL.")
         raise Exception(f"Unhandled annotation: {ann}")
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
@@ -230,7 +227,7 @@ class Translator:
         return "[" + ", ".join(t) + "]"
 
     def gen_dict(self, keys: List[str], values: List[str]) -> str:
-        return "{" + ", ".join(f"{k}: {v}" for k, v in zip(keys, values)) + "}"
+        Exception(f"Dicts do not exist in COBOL.")
 
     def gen_call(self, func: str, args: List[str]) -> str:
         """Translate a function call `func(args)`
