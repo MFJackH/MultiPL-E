@@ -57,7 +57,7 @@ class Translator:
         ]
         return preamble 
     
-    def gen_data_item_type(self, id, list, type=None) -> CobolDataItem:
+    def gen_data_item_type(self, id, storage_area, type=None) -> CobolDataItem:
         item = CobolDataItem()
         item.name = f"{id}-{self.ws_count}"
 
@@ -66,24 +66,24 @@ class Translator:
 
         item.type = type
 
-        list.append(f"01 {self.get_usage_type()}-{item.name} {item.type}.")
+        storage_area.append(f"01 {self.get_usage_type()}-{item.name} {item.type}.")
         self.ws_count += 1
         return item 
     
-    def gen_list_data_item(self, id, list, prefix="list") -> CobolDataItem:
+    def gen_list_data_item(self, id, storage_area, prefix="list") -> CobolDataItem:
         item = CobolDataItem(list=True)
-        item.idx = self.gen_data_item_type("idx", list)
+        item.idx = self.gen_data_item_type("idx", storage_area)
         item.name = f"{self.get_usage_type()}-list-{self.ws_count}"
         item.type = self.literal_types[id]
         item.data = f"data-{item.name}"
 
         self.ws_count += 1
 
-        list.append(f"01 {item.name}.")
-        list.append(f"  03 {item.data} {item.type} occurs 1000 depending on {item.idx.name}.")
+        storage_area.append(f"01 {item.name}.")
+        storage_area.append(f"  03 {item.data} {item.type} occurs 1000 depending on {item.idx.name}.")
         return item
     
-    def gen_data_item(self, ann: ast.expr, list) -> CobolDataItem:
+    def gen_data_item(self, ann: ast.expr, storage_area) -> CobolDataItem:
         if ann == None:
             raise Exception(f"No annotation")
         
@@ -91,22 +91,20 @@ class Translator:
             case ast.Name(id="Any"):
                     raise Exception(f"Type 'any' is not supported")
             case ast.Name(id=_):
-                return self.gen_data_item_type(ann.id, list)
+                return self.gen_data_item_type(ann.id, storage_area)
             case ast.Tuple():
-                if len(ann.elts) <= 0:
-                    raise Exception(f"Empty tuples are not supported")
-                elem_type = ann.elts[0][1]
-                return self.gen_list_data_item(elem_type.id, list)
+                elem_type = ann.elts[0][1] if len(ann.elts) != 0 else ast.Name(id="bool")
+                return self.gen_list_data_item(elem_type.id, storage_area)
             case ast.List(elts=_):
                 elem_type = ann.elts[0][1] if len(ann.elts) != 0 else ast.Name(id="bool")
-                return self.gen_list_data_item(elem_type.id, list)
+                return self.gen_list_data_item(elem_type.id, storage_area)
             case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
                 if isinstance(elem_type, ast.Subscript):
                     raise Exception(f"Nested lists are not supported")
-                return self.gen_list_data_item(elem_type.id, list)
+                return self.gen_list_data_item(elem_type.id, storage_area)
             case ast.Subscript(value=ast.Name(id="Tuple"), slice=elem_type):
                 # Tuples are just lists
-                return self.gen_list_data_item(elem_type.elts[0].id, list, prefix="tuple")
+                return self.gen_list_data_item(elem_type.elts[0].id, storage_area, prefix="tuple")
             case ast.Subscript(value=ast.Name(id="Dict"), slice=elem_type):
                 raise Exception(f"Dicts do not exist in COBOL.")
             case ast.Subscript(value=ast.Name(id="Optional"), slice=elem_type):
