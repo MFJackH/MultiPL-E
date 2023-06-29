@@ -5,6 +5,11 @@ from typing import List, Dict, Tuple
 
 DOCSTRING_LINESTART_RE = re.compile("""\n(\s+)""")
 
+class CobolDataItem:
+    
+    def __init__(self, list=False):
+        self.is_list = list
+    
 class Translator:
     
     cols="       "
@@ -14,8 +19,10 @@ class Translator:
 
     prefix_last=True
 
+
     def __init__(self):
         self.ws = []
+        self.list_dict = {}
         self.ws_count=0;
         self.structure_initialisation=[]
         self.sections = []
@@ -23,7 +30,8 @@ class Translator:
             "bool": "pic x comp-x",
             "int": "pic x(4) comp-x",
             "float": "pic 9(9)v99",
-            "str": "pic x(256)"
+            "str": "pic x(256)",
+            "idx": "pic 9(4)"
         }
     
     def indent_all(self, list) -> List[str]:
@@ -40,37 +48,47 @@ class Translator:
         ]
         return preamble 
     
-    def gen_data_item(self, ann: ast.expr, list) -> str:
-        if ann == None:
-            raise Exception(f"No annotation")
+    def gen_data_item_type(self, id, list, type=None) -> CobolDataItem:
+        item = CobolDataItem()
+        item.name = f"{id}-{self.ws_count}"
 
-        match ann:
-            case ast.Name(id=_):
-                ws_type = self.literal_types[ann.id]
-                name = f"{ann.id}-{self.ws_count}"
-            case ast.List():
-                idx_name = f"idx-{self.ws_count}"
-                list.append(f"01 {idx_name} pic 9(4).")
-                self.ws_count += 1
-                list_name = f"list-{self.ws_count}"
-                list.append(f"01 {list_name} {self.gen_list_type(ann.elts)} occurs 1000 depending on {idx_name}.")
-                self.ws_count += 1
-                return f"{idx_name} {list_name}" 
-            case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
-                # List as a parameter.
-                idx_name = f"idx-{self.ws_count}"
-                list.append(f"01 {idx_name} pic 9(4).")
-                self.ws_count += 1
-                list_name = f"list-{self.ws_count}"
-                list.append(f"01 {list_name} {self.literal_types[elem_type.id]} occurs 1000 depending on {idx_name}.")
-                self.ws_count += 1
-                return f"{idx_name} {list_name}"
-            case _:
-                raise Exception(f"Unhandled annotation: {ann}")
+        if type is None:
+            type = self.literal_types[id]
+
+        item.type = type
+
+        list.append(f"01 {item.name} {item.type}.")
+        self.ws_count += 1
+        return item 
+    
+    def gen_list_data_item(self, id, list) -> CobolDataItem:
+        item = CobolDataItem(list=True)
+        item.idx = self.gen_data_item_type("idx", list)
+        item.name = f"list-{self.ws_count}"
+        item.type = self.literal_types[id]
 
         self.ws_count += 1
-        list.append(f"01 {name} {ws_type}.")
-        return name
+
+        list.append(f"01 {item.name}.")
+        list.append(f"  03 data-{item.name} {item.type} occurs 1000 depending on {item.idx.name}")
+        return item
+    
+    def gen_data_item(self, ann: ast.expr, list) -> CobolDataItem:
+        if ann == None:
+            raise Exception(f"No annotation")
+        
+        match ann:
+            case ast.Name(id=_):
+                return self.gen_data_item_type(ann.id, list)
+            case ast.List():
+                elem_type = ann.elts[0][1]
+                return self.gen_list_data_item(elem_type.id, list)
+            case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
+                return self.gen_list_data_item(elem_type.id, list)
+            case ast.Subscript(value=ast.Name(id="Dict"), slice=elem_type):
+                # A dictionary is just a table.
+                pass
+        raise Exception(f"Unhandled annotation: {ann}")
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
         # Set up globals
@@ -90,20 +108,19 @@ class Translator:
 
         for arg in args:
             data_item = self.gen_data_item(arg.annotation, prompt_lk)
-            on_entry_help_text.append(f"*> {data_item} is received on entry.")
-            arg_list += data_item + " "
+            on_entry_help_text.append(f"*> {data_item.name} is received on entry.")
+            arg_list += data_item.name + " "
 
         # We're going to need a returning item for this.
         return_item = self.gen_data_item(_returns, prompt_ws)
 
         # Looks like our returning item was really a list.
-        if len(return_item.split(" ")) > 1:
-            # We could either do this, or maybe return 'address of' ?
-            return_item = return_item.split(" ")[0]
+        # FIXME this is terrible
+        if return_item.is_list:
             prompt_ws = prompt_ws[:-1]
-            prompt_ws.append(f"01 {return_item} pointer.")
+            prompt_ws.append(f"01 {return_item.name} pointer.")
         
-        on_return_help_text.append(f"*> Return from program with 'goback returning {return_item}.'")
+        on_return_help_text.append(f"*> Return from program with 'goback returning {return_item.name}.'")
 
         prompt = cbl_description.split("\n")
         prompt += on_entry_help_text
@@ -145,13 +162,15 @@ class Translator:
 
         return_item=self.gen_data_item(self.ret_ann, self.ws)
 
-        if type(ltype) == ast.List and type(rtype) == ast.List:
-            equality_section = self.gen_equality_section(lvalue, rvalue, return_item)
-            self.sections.append(equality_section)
+        if return_item.is_list:
+            comp = self.list_dict[rvalue]
+            comparison = f"if {return_item.name}(1:{return_item.idx.name}) = {comp.name}(1:{comp.idx.name})"
+        else:
+            comparison = f"if {return_item.name} = {rvalue}"
 
         equality = [
-            f"{lvalue} returning {return_item}.",
-            f"if {return_item} = {rvalue}",
+            f"{lvalue} returning {return_item.name}.",
+            comparison,
             "    display \"pass\"",
             "else",
             "    display \"fail\"",
@@ -172,26 +191,6 @@ class Translator:
             func_name = func
 
         return self.list_to_indent_str([f"call \"{func_name}\" using by reference {arg_list}"])
-    
-    def gen_equality_section(self, lvalue,rvalue, return_item):
-        return f"""
-        check-{lvalue}-{rvalue}-equality section.
-            if length of {lvalue} not equal length of {rvalue}
-                move false to return-code
-                exit section
-            end-if
-            perform varying ws-i from 1 by 1
-            until ws-i > length of list-1
-                if {lvalue}(ws-i) not equal {rvalue}(ws-i)
-                    move false to return-code
-                    exit section
-                end-if
-            end-perform 
-            move true to {return_item}
-            .
-        """
-
-    # Below are todo. Produces typescript.
 
     def gen_literal(self, c: bool | str | int | float) -> Tuple[str, ast.Name]:
         """Translate a literal expression
@@ -216,27 +215,16 @@ class Translator:
         return v
 
     def gen_list(self, l: List[Tuple[str, ast.Expr]]) -> Tuple[str, ast.Expr]:
-        name = self.gen_data_item(ast.List(elts=l), self.ws)
+        item = self.gen_data_item(ast.List(elts=l), self.ws)
 
-        # The list name is actually a pair of space seperated index and list variable...
-        # Look just don't worry about it ok
-
-        idx = name.split(" ")[0]
-        list = name.split(" ")[1]
-
-        # List Initialisation
         if len(l) != 0:
-            self.structure_initialisation.append(f"*> Initialisation for {list}")
-            self.structure_initialisation.append(f"move {len(l)} to {idx}")
+            self.structure_initialisation.append(f"*> Initialisation for {item.name}")
+            self.structure_initialisation.append(f"move {len(l)} to {item.idx.name}")
             for position, (elem, _) in enumerate(l):
-                self.structure_initialisation.append(f"move {elem} to {list}({position+1})")
+                self.structure_initialisation.append(f"move {elem} to {item.name}({position+1})")
 
-        return name, ast.List()
-
-    def gen_list_type(self, l: List[Tuple[str, ast.Expr]]) -> str:
-        elem_type = l[0][1]
-        if elem_type.id in self.literal_types.keys():
-            return f"{self.literal_types[elem_type.id]}"
+        self.list_dict[item.name] = item
+        return item.name, ast.List()
 
     def gen_tuple(self, t: List[str]) -> str:
         return "[" + ", ".join(t) + "]"
