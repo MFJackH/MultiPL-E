@@ -177,7 +177,7 @@ class Translator:
             "end-if"]
         return self.list_to_indent_str(equality)
     
-    def gen_call(self, func: str, args: List[str]) -> str:
+    def gen_call(self, func: str, args: List[str]) -> Tuple[str, None]:
         """Translate a function call `func(args)`
         A function call f(x, y, z) translates to f(x, y, z)
         """
@@ -190,17 +190,39 @@ class Translator:
         else:
             func_name = func
 
-        return self.list_to_indent_str([f"call \"{func_name}\" using by reference {arg_list}"])
+        return self.list_to_indent_str([f"call \"{func_name}\" using by reference {arg_list}"]), None
+    
+    def gen_equality_section(self, lvalue,rvalue, return_item):
+        return f"""
+        check-{lvalue}-{rvalue}-equality section.
+            if length of {lvalue} not equal length of {rvalue}
+                move false to return-code
+                exit section
+            end-if
+            perform varying ws-i from 1 by 1
+            until ws-i > length of list-1
+                if {lvalue}(ws-i) not equal {rvalue}(ws-i)
+                    move false to return-code
+                    exit section
+                end-if
+            end-perform 
+            move true to {return_item}
+            .
+        """
 
+    # Below are todo. Produces typescript.
     def gen_literal(self, c: bool | str | int | float) -> Tuple[str, ast.Name]:
         """Translate a literal expression
         c: is the literal value
         """
         if type(c) == bool:
-            return "1" if c else "0", ast.Name("bool")
+            if c:
+                return "1", ast.Name("bool")
+            else:
+                return "0", ast.Name("bool")
         elif type(c) == str:
-            c = c.replace('\n','\\n'), ast.Name("str")
-            return f'"{c}"'
+            c = c.replace('\n','\\n')
+            return f'"{c}"', ast.Name("str")
         elif type(c) == int:
             return repr(c), ast.Name("int")
         elif type(c) == float:
@@ -232,7 +254,7 @@ class Translator:
     def gen_dict(self, keys: List[str], values: List[str]) -> str:
         return "{" + ", ".join(f"{k}: {v}" for k, v in zip(keys, values)) + "}"
 
-    def gen_call(self, func: str, args: List[str]) -> str:
+    def gen_call(self, func: str, args: List[str]) -> Tuple[str, None]:
         """Translate a function call `func(args)`
         A function call f(x, y, z) translates to f(x, y, z)
         """
@@ -245,4 +267,16 @@ class Translator:
         else:
             func_name = func
 
-        return f"call \"{func_name}\" using by reference {arg_list}", ast.Call()
+        return f"call \"{func_name}\" using by reference {arg_list}", None
+    
+    def file_ext(self):
+        return "cbl"
+    
+    def finalize(self, expr, context):
+        match context:
+            case "lhs":
+                return expr[0]
+            case "rhs":
+                return expr[0]
+            case _other:
+                raise Exception("bad finalize context")
