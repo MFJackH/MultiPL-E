@@ -64,11 +64,12 @@ class Translator:
         item.idx = self.gen_data_item_type("idx", list)
         item.name = f"{prefix}-{self.ws_count}"
         item.type = self.literal_types[id]
+        item.data = f"data-{item.name}"
 
         self.ws_count += 1
 
         list.append(f"01 {item.name}.")
-        list.append(f"  03 data-{item.name} {item.type} occurs 1000 depending on {item.idx.name}")
+        list.append(f"  03 {item.data} {item.type} occurs 1000 depending on {item.idx.name}.")
         return item
     
     def gen_data_item(self, ann: ast.expr, list) -> CobolDataItem:
@@ -239,7 +240,7 @@ class Translator:
             self.structure_initialisation.append(f"*> Initialisation for {item.name}")
             self.structure_initialisation.append(f"move {len(l)} to {item.idx.name}")
             for position, (elem, _) in enumerate(l):
-                self.structure_initialisation.append(f"move {elem} to {item.name}({position+1})")
+                self.structure_initialisation.append(f"move {elem} to {item.data}({position+1})")
 
         self.list_dict[item.name] = item
         return item.name, ast.List()
