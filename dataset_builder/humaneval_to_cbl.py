@@ -59,10 +59,10 @@ class Translator:
         self.ws_count += 1
         return item 
     
-    def gen_list_data_item(self, id, list) -> CobolDataItem:
+    def gen_list_data_item(self, id, list, prefix="list") -> CobolDataItem:
         item = CobolDataItem(list=True)
         item.idx = self.gen_data_item_type("idx", list)
-        item.name = f"list-{self.ws_count}"
+        item.name = f"{prefix}-{self.ws_count}"
         item.type = self.literal_types[id]
 
         self.ws_count += 1
@@ -76,15 +76,33 @@ class Translator:
             raise Exception(f"No annotation")
         
         match ann:
+            case ast.Name(id="Any"):
+                    raise Exception(f"Type 'any' is not supported")
             case ast.Name(id=_):
                 return self.gen_data_item_type(ann.id, list)
+            case ast.Tuple():
+                if len(ann.elts) <= 0:
+                    raise Exception(f"Empty tuples are not supported")
+                elem_type = ann.elts[0][1]
+                return self.gen_list_data_item(elem_type.id, list)
             case ast.List():
+                if len(ann.elts) <= 0:
+                    raise Exception(f"Empty lists are not supported")
                 elem_type = ann.elts[0][1]
                 return self.gen_list_data_item(elem_type.id, list)
             case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
+                if isinstance(elem_type, ast.Subscript):
+                    raise Exception(f"Nested lists are not supported")
                 return self.gen_list_data_item(elem_type.id, list)
+            case ast.Subscript(value=ast.Name(id="Tuple"), slice=elem_type):
+                # Tuples are just lists
+                return self.gen_list_data_item(elem_type.elts[0].id, list, prefix="tuple")
             case ast.Subscript(value=ast.Name(id="Dict"), slice=elem_type):
-                Exception(f"Dicts do not exist in COBOL.")
+                raise Exception(f"Dicts do not exist in COBOL.")
+            case ast.Subscript(value=ast.Name(id="Optional"), slice=elem_type):
+                raise Exception(f"Optional does not exist in COBOL.")
+            case ast.Subscript(value=ast.Name(id="Union"), slice=elem_type):
+                raise Exception(f"Union does not exist in COBOL.")
         raise Exception(f"Unhandled annotation: {ann}")
 
     def translate_prompt(self, name: str, args: List[ast.arg], _returns, description: str) -> str:
@@ -245,8 +263,18 @@ class Translator:
         self.list_dict[item.name] = item
         return item.name, ast.List()
 
-    def gen_tuple(self, t: List[str]) -> str:
-        return "[" + ", ".join(t) + "]"
+    def gen_tuple(self, t: List[Tuple[str, ast.Expr]]) -> Tuple[str, ast.Tuple]:
+        item = self.gen_data_item(ast.Tuple(elts=t), self.ws) 
+
+        if len(t) != 0:
+            self.structure_initialisation.append(f"*> Initialisation for {item.name}")
+            self.structure_initialisation.append(f"move {len(t)} to {item.idx.name}")
+            for position, (elem, _) in enumerate(t):
+                self.structure_initialisation.append(f"move {elem} to {item.name}({position+1})")
+
+        self.list_dict[item.name] = item
+        return item.name, ast.Tuple()
+
 
     def gen_dict(self, keys: List[str], values: List[str]) -> str:
         Exception(f"Dicts do not exist in COBOL.")
