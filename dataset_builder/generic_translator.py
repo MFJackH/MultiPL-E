@@ -113,9 +113,16 @@ class PromptVisitor(ast.NodeVisitor):
                             transl_funccall = self.translator.finalize(transl_funccall, "lhs")
                             transl_output = self.translator.finalize(transl_output, "rhs")
                         # Why is this str() here?
-                        desc += '>>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
+                        if self.translator.file_ext() == "cbl":
+                            desc += 'Example call in Python with values:\n'
+                            desc += '*> ' + doclist[0] + '\n    ' + doclist[1] + '\n'
+                            desc += '*> Example call in COBOL (values will be moved into any structures):\n'
+                            desc += '*> >>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
+                        else:
+                            desc += '*> >>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
                         pos = i[1]
                     
+                    desc += '*> Write the solution within the defined function below\n'
                     desc += self.description[pos:]
 
                     # for test in (promptAndDoctests[1:]): #Removing each doctest from any junk
@@ -196,9 +203,10 @@ def translate_tests(translator, py_tests: str, entry_point: str, filename: str) 
                 try:
                     left = translate_expr(translator, left)
                     right = translate_expr(translator, right)
-                    if hasattr(translator, "finalize"):
-                        left = translator.finalize(left, "lhs")
-                        right = translator.finalize(right, "rhs")
+                    if(translator.file_ext() != "cbl"):
+                        if hasattr(translator, "finalize"):
+                            left = translator.finalize(left, "lhs")
+                            right = translator.finalize(right, "rhs")
                     test_cases.append(translator.deep_equality(left, right))
                 except Exception as e:
                     print(f"Exception translating expressions for {filename}: {e}")
