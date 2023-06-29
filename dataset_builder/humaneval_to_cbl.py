@@ -2,8 +2,14 @@
 import re
 import ast
 from typing import List, Dict, Tuple
+import enum
 
 DOCSTRING_LINESTART_RE = re.compile("""\n(\s+)""")
+
+class DataItemUsage(enum.Enum):
+    PARAMETER = 0
+    RETURN = 1
+    EXPECTED = 2
 
 class CobolDataItem:
     
@@ -19,6 +25,11 @@ class Translator:
     prefix_last=True
 
     def __init__(self):
+        # Used to provide unique names to storage items
+        self.value_type = ["input", "output", "expected"]
+        self.data_item_usage = DataItemUsage.PARAMETER
+        self.assert_offset = 0
+
         self.ws = []
         self.list_dict = {}
         self.ws_count=0;
@@ -55,14 +66,14 @@ class Translator:
 
         item.type = type
 
-        list.append(f"01 {item.name} {item.type}.")
+        list.append(f"01 {self.get_usage_type()}-{item.name} {item.type}.")
         self.ws_count += 1
         return item 
     
     def gen_list_data_item(self, id, list, prefix="list") -> CobolDataItem:
         item = CobolDataItem(list=True)
         item.idx = self.gen_data_item_type("idx", list)
-        item.name = f"{prefix}-{self.ws_count}"
+        item.name = f"{self.get_usage_type()}-list-{self.ws_count}"
         item.type = self.literal_types[id]
 
         self.ws_count += 1
@@ -85,10 +96,8 @@ class Translator:
                     raise Exception(f"Empty tuples are not supported")
                 elem_type = ann.elts[0][1]
                 return self.gen_list_data_item(elem_type.id, list)
-            case ast.List():
-                if len(ann.elts) <= 0:
-                    raise Exception(f"Empty lists are not supported")
-                elem_type = ann.elts[0][1]
+            case ast.List(elts=_):
+                elem_type = ann.elts[0][1] if len(ann.elts) != 0 else ast.Name(id="bool")
                 return self.gen_list_data_item(elem_type.id, list)
             case ast.Subscript(value=ast.Name(id="List"), slice=elem_type):
                 if isinstance(elem_type, ast.Subscript):
@@ -175,7 +184,9 @@ class Translator:
         lvalue, ltype = left
         rvalue, rtype = right
 
+        self.data_item_usage = DataItemUsage.RETURN
         return_item=self.gen_data_item(self.ret_ann, self.ws)
+        self.data_item_usage = DataItemUsage.PARAMETER
 
         if return_item.is_list:
             comp = self.list_dict[rvalue]
@@ -271,3 +282,12 @@ class Translator:
                 return expr[0]
             case _other:
                 raise Exception("bad finalize context")
+
+    def set_usage_as_parameter(self) -> None:
+        self.data_item_usage = DataItemUsage.PARAMETER
+
+    def set_usage_as_expected(self) -> None:
+        self.data_item_usage = DataItemUsage.EXPECTED
+
+    def get_usage_type(self) -> str:
+        return self.value_type[self.data_item_usage.value]

@@ -201,13 +201,20 @@ def translate_tests(translator, py_tests: str, entry_point: str, filename: str) 
                 test=ast.Compare(left=left, ops=[ast.Eq()], comparators=[right])
             ):
                 try:
+                    if translator.file_ext() == "cbl":
+                        translator.set_usage_as_parameter()
                     left = translate_expr(translator, left)
+                    if translator.file_ext() == "cbl":
+                        translator.set_usage_as_expected()
                     right = translate_expr(translator, right)
                     if(translator.file_ext() != "cbl"):
                         if hasattr(translator, "finalize"):
                             left = translator.finalize(left, "lhs")
                             right = translator.finalize(right, "rhs")
                     test_cases.append(translator.deep_equality(left, right))
+                    
+                    if translator.file_ext() == "cbl":
+                        translator.assert_offset += 1
                 except Exception as e:
                     print(f"Exception translating expressions for {filename}: {e}")
                     traceback.print_exception(e)
