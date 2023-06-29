@@ -197,8 +197,8 @@ class Translator:
         A function call f(x, y, z) translates to f(x, y, z)
         """
         arg_list = ""
-        for arg in args:
-            arg_list = arg_list + arg + " "
+        for value, type in args:
+            arg_list += value + " "
 
         if func == "candidate":
             func_name = self.entry_point
@@ -207,25 +207,6 @@ class Translator:
 
         return self.list_to_indent_str([f"call \"{func_name}\" using by reference {arg_list}"]), None
     
-    def gen_equality_section(self, lvalue,rvalue, return_item):
-        return f"""
-        check-{lvalue}-{rvalue}-equality section.
-            if length of {lvalue} not equal length of {rvalue}
-                move false to return-code
-                exit section
-            end-if
-            perform varying ws-i from 1 by 1
-            until ws-i > length of list-1
-                if {lvalue}(ws-i) not equal {rvalue}(ws-i)
-                    move false to return-code
-                    exit section
-                end-if
-            end-perform 
-            move true to {return_item}
-            .
-        """
-
-    # Below are todo. Produces typescript.
     def gen_literal(self, c: bool | str | int | float) -> Tuple[str, ast.Name]:
         """Translate a literal expression
         c: is the literal value
@@ -277,22 +258,7 @@ class Translator:
 
 
     def gen_dict(self, keys: List[str], values: List[str]) -> str:
-        Exception(f"Dicts do not exist in COBOL.")
-
-    def gen_call(self, func: str, args: List[str]) -> Tuple[str, None]:
-        """Translate a function call `func(args)`
-        A function call f(x, y, z) translates to f(x, y, z)
-        """
-        arg_list = ""
-        for value, type in args:
-            arg_list += value + " "
-
-        if func == "candidate":
-            func_name = self.entry_point
-        else:
-            func_name = func
-
-        return f"call \"{func_name}\" using by reference {arg_list}", None
+        raise Exception(f"Dicts do not exist in COBOL.")
     
     def file_ext(self):
         return "cbl"

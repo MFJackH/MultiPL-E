@@ -114,9 +114,9 @@ class PromptVisitor(ast.NodeVisitor):
                             transl_output = self.translator.finalize(transl_output, "rhs")
                         # Why is this str() here?
                         if self.translator.file_ext() == "cbl":
-                            desc += 'Example call in Python with values:\n'
+                            desc += 'Example call and output in Python with values:\n'
                             desc += '*> ' + doclist[0] + '\n    ' + doclist[1] + '\n'
-                            desc += '*> Example call in COBOL (values will be moved into any structures):\n'
+                            desc += '*> Example call and output in COBOL (values will be moved into any structures):\n'
                             desc += '*> >>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
                         else:
                             desc += '*> >>> ' + transl_funccall + '\n    ' + str(transl_output) + '\n'
